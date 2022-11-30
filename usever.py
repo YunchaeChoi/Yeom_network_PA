@@ -42,37 +42,17 @@ def recving():
             queue.put(seq_n)
             # else:
             #     break
-            
-# # thread for sending acks
-# def sending():
-#     global rcv_base
-#     global serverSocket
-#     global queue
-#     global clientAddress
-#     # global flag_recving_sending
-    
-#     while True:
-#         if queue.qsize() > 3:
-#             seq_n = queue.get()
-#             print("GET!!")
-#             if seq_n == rcv_base: # in order delivery
-#                 rcv_base = seq_n + 1 
-#             serverSocket.sendto(str(rcv_base-1).encode(), clientAddress) # send cumulative ack
-#             if seq_n == 999:
-#                 break
         
 th_recving = Thread(target = recving, args = ())
 th_recving.start()
-# th_sending = Thread(target= sending, args = ())
-# th_sending.start()
 
 while True:
-    time.sleep(0.0002)
+    time.sleep(0.0003)
     seq_n = queue.get()
     print("GET!!")
     if seq_n == rcv_base: # in order delivery
         rcv_base = seq_n + 1 
-    print("q size, rcv_base:", queue.qsize(), rcv_base)
+    print("q size, rcv_base, seq_n:", queue.qsize(), rcv_base, seq_n)
     serverSocket.sendto(str(rcv_base-1).encode(), clientAddress) # send cumulative ack
     # if seq_n == 999:
     if rcv_base == 1000:
@@ -81,44 +61,6 @@ while True:
 
 print("donedoneondeondoneondondonoendoneodnodnoen")
 done_flag = True
+print(done_flag)
 serverSocket.close()
 print("EOF")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# from socket import *
-
-# serverPort = 12000
-
-# serverSocket = socket(AF_INET, SOCK_DGRAM)
-# serverSocket.bind(('', serverPort))
-
-# print('The server is ready to receive')
-
-# rcv_base = 0  # next sequence number we wait for
-
-# while True:
-#     message, clientAddress = serverSocket.recvfrom(2048)
-#     seq_n = int(message.decode()) # extract sequence number
-#     print(seq_n)
-#     if seq_n == rcv_base: # in order delivery
-#         rcv_base = seq_n + 1 
-#     serverSocket.sendto(str(rcv_base-1).encode(), clientAddress) # send cumulative ack
-#     if seq_n == 999:
-#         break
-
-# serverSocket.close()
-
-

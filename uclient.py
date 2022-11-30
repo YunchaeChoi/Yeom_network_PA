@@ -2,6 +2,7 @@ from socket import *
 from threading import Thread
 import random
 import time
+import sys
 
 serverIP = '127.0.0.1' # special IP for local host
 serverPort = 12000
@@ -13,6 +14,8 @@ send_base = 0 # oldest packet sent
 loss_rate = 0.01 # loss rate
 seq = 0        # initial sequence number
 timeout_flag = 0 # timeout trigger
+
+loss_flag = False # True if loss is detected
 
 triple_flag = 0 # triple duplicate ACK trigger
 ack_queue = [] # ack queue. if the queue is full(len = 3), -> triple duplicate ACK
@@ -43,6 +46,7 @@ def handling_ack():
     global triple_flag
     global ack_queue
     global how_many_retransmission_by_triple
+    global loss_flag
 
     alpha = 0.125
     beta = 0.25
@@ -65,11 +69,14 @@ def handling_ack():
             print("timeout detected:", str(send_base), flush=True)
             print("timeout interval:", str(timeout_interval), flush=True)
             timeout_flag = 1
+            loss_flag = True
             
         if len(ack_queue) == 3 and ack_queue[0] == ack_queue[1] and ack_queue[1] == ack_queue[2]:
-            print("triple duplicate ACK detected:", str(send_base), flush=True)
+            print("triple detected (send_base, ack):", str(send_base), ack_queue[1] ,flush=True)
             # print("duplciate ACK:", str(ack_queue[0]), flush=True)
             triple_flag = 1
+            loss_flag = True
+            # ack_queue = []
 
         try:
             ack, serverAddress = clientSocket.recvfrom(2048)
@@ -107,6 +114,7 @@ def handling_ack():
         send_base = ack_n + 1
         
         if ack_n == 999:
+            print("ack_999 break")
             break
 
 # running a thread for receiving and handling acks
@@ -115,7 +123,9 @@ th_handling_ack.start()
 
 while seq < no_pkt:
     while seq < send_base + win: # send packets within window
-        if random.random() < 1 - loss_rate: # emulate packet loss
+        # if random.random() < 1 - loss_rate: # emulate packet loss
+            # clientSocket.sendto(str(seq).encode(), (serverIP, serverPort))  
+        if loss_flag == False:
             clientSocket.sendto(str(seq).encode(), (serverIP, serverPort))  
         sent_time[seq] = time.time()    
         seq = seq + 1
@@ -128,10 +138,13 @@ while seq < no_pkt:
         seq = seq + 1
         timeout_flag = 0
         how_many_retransmission_by_timeout += 1
+        loss_flag = False
         
     if triple_flag == 1: # retransmission by triple duplicate ACK
         seq = send_base
         clientSocket.sendto(str(seq).encode(), (serverIP, serverPort))
+        ack_queue = []
+        loss_flag = False
         sent_time[seq] = time.time()
         print("retransmission_triple:", str(seq), flush=True)
         seq = seq + 1
@@ -139,6 +152,8 @@ while seq < no_pkt:
         how_many_retransmission_by_triple += 1
         
         
+print("while done")
+sys.exit(0)
 th_handling_ack.join() # terminating thread
 
 print ("done")
