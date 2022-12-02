@@ -52,12 +52,15 @@ def recving():
             break
             
         print("try to receive")
-        receive_count += 1
+        # receive_count += 1
         message, clientAddress = serverSocket.recvfrom(2048)
         seq_n = int(message.decode()) # extract sequence number
         print(seq_n)
         time_now  = time.time()
-        pkt_delay = time_now - last_recv_time
+        if last_recv_time:
+            pkt_delay = time_now - last_recv_time
+        else:
+            pkt_delay = time.time() - time_now
         last_recv_time = time_now
         
         if queue.qsize() < queue_max_size:
@@ -69,15 +72,14 @@ th_recving = Thread(target = recving, args = ())
 th_recving.start()
 
 while True:
-    if receive_count >= queue_max_size/2:
-        time.sleep(pkt_delay * (queue_max_size + 1) / (queue.qsize() + 1) ) 
-        receive_count = 0    
+    # if receive_count >= queue_max_size/2:
+    #     time.sleep(pkt_delay * (queue_max_size + 1) / (queue.qsize() + 1) ) 
+    #     receive_count = 0    
     
     seq_n = queue.get()
-    # print("GET!!")
     if seq_n >= rcv_base: # in order delivery
-    # if seq_n <= rcv_base: # in order delivery
         rcv_base = seq_n + 1 
+    time.sleep(pkt_delay * 0.8)
     print("q size, rcv_base, seq_n:", queue.qsize(), rcv_base, seq_n)
     serverSocket.sendto(str(rcv_base-1).encode(), clientAddress) # send cumulative ack
     # if seq_n == 999:
