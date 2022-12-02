@@ -69,19 +69,12 @@ th_recving = Thread(target = recving, args = ())
 th_recving.start()
 
 while True:
-    # time.sleep(random.random() / 10)
-    if receive_count >= 20:
-        time.sleep(pkt_delay * 10)
-    #     time.sleep(pkt_delay * 0.04)
-    #     print("time:",pkt_delay * 0.04)
-    #     # time.sleep(2)
-        receive_count = 0
-    #     continue
-    
+    if receive_count >= queue_max_size/2:
+        time.sleep(pkt_delay * (queue_max_size + 1) / (queue.qsize() + 1) ) 
+        receive_count = 0    
     
     seq_n = queue.get()
     # print("GET!!")
-    # time.sleep(pkt_delay * 2)
     if seq_n >= rcv_base: # in order delivery
     # if seq_n <= rcv_base: # in order delivery
         rcv_base = seq_n + 1 
