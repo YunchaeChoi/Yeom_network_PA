@@ -9,12 +9,14 @@ serverPort = 12000
 
 serverSocket = socket(AF_INET, SOCK_DGRAM)
 serverSocket.bind(('', serverPort))
+start_time = time.time()
 
 print('The server is ready to receive')
 
 rcv_base = 0  # next sequence number we wait for
 
 queue_max_size = 20
+loss_rate = 0.9
 
 queue = Queue() # queue that stores acks
 clientAddress = None
@@ -24,12 +26,6 @@ done_flag = False
 pkt_delay = 0
 last_recv_time = 0
 
-"""
-loss rate를 10%로 만드려면,
-1초에 들어오는 packet 개수 in, 나가는 packet 개수 out
-out/in 이 9/10이 되도록 하면? 될 듯
-packet 10개 들어오면 9개 보내기
-"""
 
 receive_count = 0
 
@@ -52,7 +48,6 @@ def recving():
             break
             
         print("try to receive")
-        # receive_count += 1
         message, clientAddress = serverSocket.recvfrom(2048)
         seq_n = int(message.decode()) # extract sequence number
         print(seq_n)
@@ -72,14 +67,10 @@ th_recving = Thread(target = recving, args = ())
 th_recving.start()
 
 while True:
-    # if receive_count >= queue_max_size/2:
-    #     time.sleep(pkt_delay * (queue_max_size + 1) / (queue.qsize() + 1) ) 
-    #     receive_count = 0    
-    
     seq_n = queue.get()
     if seq_n >= rcv_base: # in order delivery
         rcv_base = seq_n + 1 
-    time.sleep(pkt_delay * 0.8)
+    time.sleep(pkt_delay * (loss_rate))
     print("q size, rcv_base, seq_n:", queue.qsize(), rcv_base, seq_n)
     serverSocket.sendto(str(rcv_base-1).encode(), clientAddress) # send cumulative ack
     # if seq_n == 999:
@@ -90,3 +81,4 @@ while True:
 done_flag = True
 serverSocket.close()
 print("done")
+print("Elapsed time:", time.time() - start_time)
