@@ -3,12 +3,18 @@ from threading import Thread
 import random
 import time
 import sys
+import math
+import matplotlib.pyplot as plt
+import numpy as np
 
 serverIP = '127.0.0.1' # special IP for local host
 serverPort = 12000
 clientPort = 12001
 
-win = 10      # window size
+# win = 10      # window size
+win = 1 # window size for slow start
+ssthresh = 16 # if window size exceeds this threshold, slow start ends
+
 no_pkt = 1000 # the total number of packets to send
 send_base = 0 # oldest packet sent
 loss_rate = 0.01 # loss rate
@@ -22,7 +28,14 @@ ack_queue = [] # ack queue. if the queue is full(len = 3), -> triple duplicate A
 how_many_retransmission_by_triple = 0
 how_many_retransmission_by_timeout = 0
 
+triple_ack = 0 # triple duplicate으로 온 그 ack 저장
+
 sent_time = [0 for i in range(2000)]
+
+window_size_history = []
+ack_history = []
+
+temp_flag = True
 
 
 clientSocket = socket(AF_INET, SOCK_DGRAM)
@@ -47,6 +60,12 @@ def handling_ack():
     global ack_queue
     global how_many_retransmission_by_triple
     global loss_flag
+    global win
+    global ssthresh
+    global window_size_history
+    global triple_ack
+    global ack_history
+    global temp_flag
 
     alpha = 0.125
     beta = 0.25
@@ -55,8 +74,7 @@ def handling_ack():
     
     pkt_delay = 0
     dev_rtt = 0
-    init_rtt_flag = 1
-    
+    init_rtt_flag = 1    
     
     
     while True:
@@ -70,31 +88,59 @@ def handling_ack():
             print("timeout interval:", str(timeout_interval), flush=True)
             timeout_flag = 1
             loss_flag = True
+            win = math.ceil(win / 2)
+            ack_history.append(send_base)
+            window_size_history.append(win)
+            # print("win size:", win)
+            win = 1
+            # window_size_history.append(win)
+            
+            
+            
             
         if len(ack_queue) == 3 and ack_queue[0] == ack_queue[1] and ack_queue[1] == ack_queue[2]:
-            print("triple detected (send_base, ack):", str(send_base), ack_queue[1] ,flush=True)
+            triple_ack = ack_queue[1]
+            print("triple detected (send_base, ack):", str(send_base), triple_ack ,flush=True)
             # print("duplciate ACK:", str(ack_queue[0]), flush=True)
             triple_flag = 1
             loss_flag = True
-            # ack_queue = []
+            win = math.ceil(win / 2)
+            ack_history.append(send_base)
+            window_size_history.append(win)
+            print("win size:", win)
+            # win = 1
+            # window_size_history.append(win)
+            ack_queue = []
 
         try:
             ack, serverAddress = clientSocket.recvfrom(2048)
             ack_n = int(ack.decode())
+            # if win < ssthresh:
+            #     win += 2
+            # else:
+            #     win += 1
+            if win < ssthresh:
+                win += 1
+            else:
+                if ack_n == send_base + win - 1:
+                    win += 1
+            window_size_history.append(win)
             print(ack_n, flush=True)
+            ack_history.append(ack_n)
             
             """
             여기 ack_n을 ack_queue에 넣어야 됨!
             ack_queue의 길이가 3 이상인데 더 넣지 않도록 주의
             """
-            
-            if len(ack_queue) == 0:
-                ack_queue.append(ack_n)
-            elif len(ack_queue) > 0 and len(ack_queue) < 3:
-                if ack_queue[-1] == ack_n:
-                    ack_queue.append(ack_n)
-                else:
-                    ack_queue = []
+            if ack_n != triple_ack:
+                if len(ack_queue) == 0:
+                    if triple_flag == False:
+                        ack_queue.append(ack_n)
+                elif len(ack_queue) > 0 and len(ack_queue) < 3:
+                    if ack_queue[-1] == ack_n:
+                        ack_queue.append(ack_n)
+                    else:
+                        ack_queue = []
                   
             if init_rtt_flag == 1:
                 estimated_rtt = pkt_delay
@@ -111,26 +157,33 @@ def handling_ack():
             
         # window is moved upon receiving a new ack
         # window stays for cumulative ack
-        send_base = ack_n + 1
+        if ack_n + 1 >= send_base:
+            send_base = ack_n + 1
+        # send_base = ack_n + 1  
         
         if ack_n == 999:
             print("ack_999 break")
+            temp_flag = False
             break
 
 # running a thread for receiving and handling acks
 th_handling_ack = Thread(target = handling_ack, args = ())
 th_handling_ack.start()
 
-while seq < no_pkt:
+# while seq < no_pkt:
+while temp_flag:
     while seq < send_base + win: # send packets within window
         # if random.random() < 1 - loss_rate: # emulate packet loss
             # clientSocket.sendto(str(seq).encode(), (serverIP, serverPort))  
         if loss_flag == False:
-            clientSocket.sendto(str(seq).encode(), (serverIP, serverPort))  
+            clientSocket.sendto(str(seq).encode(), (serverIP, serverPort))
         sent_time[seq] = time.time()    
         seq = seq + 1
         
+            
+        
     if timeout_flag == 1: # retransmission
+        # if triple_flag == False:
         seq = send_base 
         clientSocket.sendto(str(seq).encode(), (serverIP, serverPort))
         sent_time[seq] = time.time()
@@ -141,6 +194,7 @@ while seq < no_pkt:
         loss_flag = False
         
     if triple_flag == 1: # retransmission by triple duplicate ACK
+        
         seq = send_base
         clientSocket.sendto(str(seq).encode(), (serverIP, serverPort))
         ack_queue = []
@@ -151,14 +205,19 @@ while seq < no_pkt:
         triple_flag = 0
         how_many_retransmission_by_triple += 1
         
-        
+print("seq:", seq) 
+print("send_base:", send_base) 
+print("window size:", win)
 print("while done")
-sys.exit(0)
+# sys.exit(0)
 th_handling_ack.join() # terminating thread
 
 print ("done")
 print("re by triple:", how_many_retransmission_by_triple)
 print("re by timeout:", how_many_retransmission_by_timeout)
+print("window size:", win)
 
 clientSocket.close()
 
+plt.plot(np.transpose(ack_history) , np.transpose(window_size_history), 'k')
+plt.savefig('temp.png')
