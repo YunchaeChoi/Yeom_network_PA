@@ -52,7 +52,7 @@ def recving():
             break
             
         print("try to receive")
-        # receive_count += 1
+        receive_count += 1
         message, clientAddress = serverSocket.recvfrom(2048)
         seq_n = int(message.decode()) # extract sequence number
         print(seq_n)
@@ -70,12 +70,12 @@ th_recving.start()
 
 while True:
     # time.sleep(random.random() / 10)
-    # if receive_count >= 10:
-        # time.sleep(pkt_delay * queue_max_size * 2)
+    if receive_count >= 20:
+        time.sleep(pkt_delay * 10)
     #     time.sleep(pkt_delay * 0.04)
     #     print("time:",pkt_delay * 0.04)
     #     # time.sleep(2)
-    #     receive_count = 0
+        receive_count = 0
     #     continue
     
     

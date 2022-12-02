@@ -89,8 +89,8 @@ def handling_ack():
             timeout_flag = 1
             loss_flag = True
             win = math.ceil(win / 2)
-            ack_history.append(send_base)
-            window_size_history.append(win)
+            # ack_history.append(send_base)
+            # window_size_history.append(win)
             # print("win size:", win)
             win = 1
             # window_size_history.append(win)
@@ -105,8 +105,8 @@ def handling_ack():
             triple_flag = 1
             loss_flag = True
             win = math.ceil(win / 2)
-            ack_history.append(send_base)
-            window_size_history.append(win)
+            # ack_history.append(send_base)
+            # window_size_history.append(win)
             print("win size:", win)
             # win = 1
             # window_size_history.append(win)
@@ -124,9 +124,9 @@ def handling_ack():
             else:
                 if ack_n == send_base + win - 1:
                     win += 1
-            window_size_history.append(win)
+            # window_size_history.append(win)
             print(ack_n, flush=True)
-            ack_history.append(ack_n)
+            # ack_history.append(send_base)
             
             """
             여기 ack_n을 ack_queue에 넣어야 됨!
@@ -159,6 +159,8 @@ def handling_ack():
         # window stays for cumulative ack
         if ack_n + 1 >= send_base:
             send_base = ack_n + 1
+            ack_history.append(send_base)
+            window_size_history.append(win)
         # send_base = ack_n + 1  
         
         if ack_n == 999:
